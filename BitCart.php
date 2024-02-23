@@ -7,6 +7,7 @@ namespace App\Extensions\Gateways\BitCart;
 use App\Classes\Extensions\Gateway;
 use App\Helpers\ExtensionHelper;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Http\Request;
 
 class BitCart extends Gateway
 {
@@ -74,8 +75,9 @@ class BitCart extends Gateway
             'price' => number_format($amount, 2, '.', ''),
             'store_id' => ExtensionHelper::getConfig('Bitcart','store_id'),
             'currency' => ExtensionHelper::getCurrency(),
-            'email' => auth()->user()->email,
+            'buyer_email' => auth()->user()->email,
             'redirect_url' => route('clients.invoice.show', $invoiceId),
+            'notification_url' => url('/extensions/bitcart/webhook'),
             'order_id' => $invoiceId,
         );
         $invoice = $this->send_request(sprintf('%s/%s', $api_domain, 'invoices/order_id/' . urlencode($invoiceId)), $params);
@@ -103,4 +105,15 @@ class BitCart extends Gateway
 
         return json_decode($result);
     }
+
+     public function webhook(Request $request)
+     {
+         $body = $request->getContent();
+         $data = json_decode($body, true);
+         $invoiceId = $data['id'];
+         $status = $data['status'];
+         if ($status == 'complete') {
+            ExtensionHelper::paymentDone($invoiceId,'BitCart',null);
+         }
+     }
 }

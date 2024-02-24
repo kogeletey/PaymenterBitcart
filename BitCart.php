@@ -61,6 +61,7 @@ class BitCart extends Gateway
      * @param int $total
      * @param array $products
      * @param int $invoiceId
+     * @return string
      */
     public function pay($total, $products, $invoiceId)
     {
@@ -109,11 +110,19 @@ class BitCart extends Gateway
      public function webhook(Request $request)
      {
          $body = $request->getContent();
+         $api_domain = ExtensionHelper::getConfig('Bitcart', 'api_endpoint');
          $data = json_decode($body, true);
+         $url_check = sprintf('%s/%s', $api_domain, 'invoices/' . $data['id']);
+         $checkData = $this->send_request($url_check, array(), 0);
          $invoiceId = $data['id'];
          $status = $data['status'];
-         if ($status == 'complete') {
-            ExtensionHelper::paymentDone($invoiceId,'BitCart',null);
+         if ($invoiceId != $checkData->id) {
+             return response()->json(['success' => false]);
          }
+         if ($status != 'complete' || $status != $checkData->status) {
+             return response()->json(['success' => false]);
+         }
+         ExtensionHelper::paymentDone($checkData -> order_id,'BitCart',null);
+         return response()->json(['success' => true]);
      }
 }
